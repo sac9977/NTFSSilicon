@@ -1,8 +1,8 @@
 import SwiftUI
+import ServiceManagement
 
-/// The Settings window (Command-Comma). One tab per topic, at most about
-/// six. Each tab is a grouped Form that sizes to its content, so the
-/// window grows to fit and shows no scroll bar it does not need.
+/// The Settings window (⌘,). Two tabs: General (behaviors and hooks) and
+/// Appearance (accent color). Both are grouped Forms that size to content.
 struct SettingsView: View {
     @Environment(AppModel.self) private var model
 
@@ -54,11 +54,18 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 }
 
 struct GeneralSettings: View {
-    @AppStorage("confirmDelete") private var confirmDelete = true
+    @AppStorage("launchAtLogin") private var launchAtLogin = false
 
     var body: some View {
-        Section("Items") {
-            Toggle("Ask before deleting items", isOn: $confirmDelete)
+        Section("Startup") {
+            Toggle("Launch on system startup", isOn: $launchAtLogin)
+                .onChange(of: launchAtLogin) { _, enabled in
+                    enabled ? try? SMAppService.mainApp.register()
+                            : try? SMAppService.mainApp.unregister()
+                }
         }
     }
 }
+
+/// (Launch-at-login writes straight to SMAppService from the toggle's
+/// onChange; the registry state is read by the system at startup.)

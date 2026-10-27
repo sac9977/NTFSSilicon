@@ -1,61 +1,48 @@
 import Foundation
-import SwiftData
 import NTFSSiliconKit
 
-@Model
-final class Item {
-    var title: String
-    var notes: String = ""
-    var isStarred: Bool = false
-    var createdAt: Date = Date.now
-    /// A stable id for links, sync, and the agent CLI.
-    var uuid: UUID = UUID()
-
-    init(title: String) {
-        self.title = title
-    }
-}
-
-/// The sidebar pages. Snapshot mode walks through every case.
-enum SidebarItem: String, CaseIterable, Identifiable {
-    case all, starred
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .all: "All Items"
-        case .starred: "Starred"
-        }
-    }
-
-    var symbol: String {
-        switch self {
-        case .all: "tray"
-        case .starred: "star"
-        }
-    }
-}
-
-/// App-wide state that menus, toolbars, and views share.
+/// App-wide state: the volume list and selection, one session-wide.
+/// There is no database — the volumes come from the system each launch;
+/// only per-volume user options persist (VolumePrefs, keyed by UUID).
 @Observable
 final class AppModel {
-    let container: ModelContainer
-    var sidebar: SidebarItem? = .all
-    var selection: PersistentIdentifier?
+    let store = VolumeStore()
+    var volumes: [VolumeInfo] = []
+    var selection: String?
+    var error: String?
+    var busyLabel: String?
     /// Settings reopens on the last tab. Test and snapshot runs leave it alone.
     var settingsTab: SettingsTab = SettingsTab(rawValue: UserDefaults.standard.string(forKey: "settings.tab") ?? "") ?? .general {
-        didSet { if !Store.isOverridden { UserDefaults.standard.set(settingsTab.rawValue, forKey: "settings.tab") } }
+        didSet { if !Env.isOverridden { UserDefaults.standard.set(settingsTab.rawValue, forKey: "settings.tab") } }
     }
 
-    init(container: ModelContainer) {
-        self.container = container
+    var selected: VolumeInfo? {
+        volumes.first { $0.device == selection }
     }
 
-    func addItem(title: String = "") {
-        let item = Item(title: ItemTitle.clean(title))
-        if sidebar == .starred { item.isStarred = true }
-        container.mainContext.insert(item)
-        selection = item.id
+    func refresh() async {
+        if let list = try? await store.refresh() {
+            volumes = list
+        }
+        if selection == nil || selected == nil {
+            selection = volumes.first { $0.isBoot }?.device ?? volumes.first?.device
+        }
+    }
+
+    func options(for volume: VolumeInfo) -> VolumeOptions {
+        VolumePrefs.options(forUUID: volume.uuid)
+    }
+
+    func setOptions(_ options: VolumeOptions, for volume: VolumeInfo) {
+        VolumePrefs.set(options, forUUID: volume.uuid)
+    }
+
+    /// Runs one action with the busy label up, refreshes afterwards,
+    /// keeps the first error inline.
+    func act(_ label: String, _ action: @escaping (VolumeStore) async -> String?) async {
+        busyLabel = label
+        defer { busyLabel = nil }
+        if let failure = await action(store) { error = failure }
+        await refresh()
     }
 }

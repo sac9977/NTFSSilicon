@@ -1,20 +1,16 @@
 import AppKit
-import SwiftData
 import SwiftUI
 
-// NTFSSilicon
-//   NTFSSilicon                      the app
-//   APP_STORE=<file> NTFSSilicon     use another database (tests, experiments)
-//   APP_SNAPSHOT=<dir> NTFSSilicon   save a PNG of every sidebar page and Settings tab in light and dark mode, then quit
-//   APP_SEED=1 NTFSSilicon           fill an empty /tmp store with sample items (tools/snap.sh)
-//   NTFSSilicon --selftest           run the self-test on a /tmp store and quit with 0 or 1 (tools/selftest.sh)
-//   APP_ACCENT=<id> NTFSSilicon      run with another accent from Theme.all (UI/Theme.swift)
-//   APP_GRID=1 NTFSSilicon           draw the 8 pt grid and the layout probes over the window
+// NTFSSilicon — a native volume manager.
+//   APP_STORE=… NTFSSilicon     mark a sandboxed run (self-test, snapshots)
+//   APP_SNAPSHOT=<dir> …        save PNGs of the window and Settings, then quit
+//   NTFSSilicon --selftest      run the self-test and quit with 0 or 1
+//   APP_ACCENT=<id> …           run with another accent from Theme.all
 
 @main
 struct NTFSSiliconApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
-    @State private var model = AppModel(container: Store.makeContainer())
+    @State private var model = AppModel()
 
     var body: some Scene {
         Window("NTFSSilicon", id: "main") {
@@ -24,17 +20,31 @@ struct NTFSSiliconApp: App {
                 .overlay { if GridOverlay.enabled { GridOverlay() } }
                 .frame(minWidth: 760, minHeight: 480)
         }
-        .modelContainer(model.container)
-        .defaultSize(width: 1100, height: 720)
+        .defaultSize(width: 960, height: 620)
         .windowToolbarStyle(.unified)
         .commands {
-            SidebarCommands()
-            ToolbarCommands()
             CommandGroup(replacing: .newItem) {
-                Button("New Item") { model.addItem() }
-                    .keyboardShortcut("n")
+                Button(model.selected?.isMounted == true ? "Unmount" : "Mount") {
+                    Task {
+                        (model.selected?.isMounted == true)
+                            ? await model.unmountSelected() : await model.mountSelected()
+                    }
+                }
+                .keyboardShortcut("m", modifiers: .command)
+                .disabled(model.selected == nil || model.busyLabel != nil)
+                Button("Eject") { Task { await model.ejectSelected() } }
+                    .keyboardShortcut("e", modifiers: .command)
+                    .disabled(model.selected == nil || model.busyLabel != nil)
+                Button("Verify") { Task { await model.verifySelected() } }
+                    .keyboardShortcut("v", modifiers: [.command, .shift])
+                    .disabled(model.selected?.isMounted != true || model.busyLabel != nil)
+                Divider()
+                Button("Refresh Volumes") { Task { await model.refresh() } }
+                    .keyboardShortcut("r", modifiers: .command)
             }
         }
+
+        VolumeMenu()
 
         Settings {
             SettingsView()
@@ -45,6 +55,37 @@ struct NTFSSiliconApp: App {
     }
 }
 
+extension AppModel {
+    @MainActor
+    func mountSelected() async {
+        guard let volume = selected else { return }
+        await act("Mounting \(volume.name)…") { await $0.mount(volume) }
+    }
+
+    @MainActor
+    func unmountSelected() async {
+        guard let volume = selected else { return }
+        await act("Unmounting \(volume.name)…") { await $0.unmount(volume) }
+    }
+
+    @MainActor
+    func ejectSelected() async {
+        guard let volume = selected else { return }
+        await act("Ejecting \(volume.name)…") { await $0.eject(volume) }
+    }
+
+    @MainActor
+    func verifySelected() async {
+        guard let volume = selected else { return }
+        await act("Verifying \(volume.name)…") { store in
+            switch await store.verify(volume) {
+            case .passed: return nil
+            case .failed(let line): return line
+            }
+        }
+    }
+}
+
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Started from a terminal, the process is not a foreground app yet.
@@ -52,7 +93,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate()
     }
 
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+    // The volume menu exists with or without the main window.
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 
     /// The self-test's result becomes the exit code, after a normal quit.
     func applicationWillTerminate(_ notification: Notification) {
@@ -60,27 +102,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-/// Where the data lives: ~/Library/Application Support/NTFSSilicon/NTFSSilicon.store
-enum Store {
-    /// True when APP_STORE points somewhere else (tests, snapshots, seed data).
+/// True when a test run points APP_STORE somewhere else (self-test, snapshots).
+enum Env {
     static var isOverridden: Bool {
         !(ProcessInfo.processInfo.environment["APP_STORE"] ?? "").isEmpty
-    }
-
-    static var url: URL {
-        if let path = ProcessInfo.processInfo.environment["APP_STORE"], !path.isEmpty {
-            return URL(fileURLWithPath: path)
-        }
-        let dir = URL.applicationSupportDirectory.appending(path: "NTFSSilicon", directoryHint: .isDirectory)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.appending(path: "NTFSSilicon.store")
-    }
-
-    static func makeContainer() -> ModelContainer {
-        do {
-            return try ModelContainer(for: Item.self, configurations: ModelConfiguration(url: url))
-        } catch {
-            fatalError("Could not open the database at \(url.path): \(error)")
-        }
     }
 }

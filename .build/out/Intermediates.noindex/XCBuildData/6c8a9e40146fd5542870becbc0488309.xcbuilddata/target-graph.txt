@@ -1,0 +1,7 @@
+Target dependency graph (3 targets)
+Target 'AllExcludingTests' in project 'Aggregate'
+➜ Explicit dependency on target 'NTFSSilicon-product' in project 'NTFSSilicon'
+➜ Explicit dependency on target 'NTFSSiliconKit' in project 'NTFSSilicon'
+Target 'NTFSSilicon-product' in project 'NTFSSilicon'
+➜ Explicit dependency on target 'NTFSSiliconKit' in project 'NTFSSilicon'
+Target 'NTFSSiliconKit' in project 'NTFSSilicon' (no dependencies)
