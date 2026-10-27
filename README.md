@@ -2,8 +2,7 @@
 
 A native Apple-Silicon volume manager for macOS 26 — see, mount, verify,
 rename and format volumes, with a menu-bar extras panel and per-volume
-options that are actually enforced. Rebuilt from Paragon NTFS for Mac's
-UX; under the hood it is pure `DiskArbitration` + `diskutil` + whatever
+options that are actually enforced. Under the hood it is pure `DiskArbitration` + `diskutil` + whatever
 filesystem tools are already installed on the machine.
 
 ## Features
