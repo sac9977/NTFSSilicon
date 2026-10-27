@@ -10,6 +10,7 @@ struct ContentView: View {
         NavigationSplitView {
             List(model.volumes, selection: selection) { volume in
                 VolumeRow(volume: volume, options: model.options(for: volume))
+                    .contextMenu { rowActions(volume: volume) } // S-043
             }
             .navigationSplitViewColumnWidth(min: 240, ideal: 280)
             .overlay {
@@ -32,6 +33,33 @@ struct ContentView: View {
             await model.refresh()
             SelfTest.runIfRequested(model: model)
             Snapshot.runIfRequested(model: model, openSettings: openSettings)
+        }
+        .sheet(item: Binding(
+            get: { model.eraseTarget },
+            set: { model.eraseTarget = $0 }
+        )) { volume in
+            EraseSheet(volume: volume)
+        }
+    }
+
+    /// Same handlers and wording as the toolbar (S-043); ellipses on the
+    /// commands that open sheets.
+    @ViewBuilder
+    private func rowActions(volume: VolumeInfo) -> some View {
+        if volume.isMounted {
+            Button("Unmount") { Task { await model.unmountTarget(volume) } }
+        } else {
+            Button("Mount") { Task { await model.mountTarget(volume) } }
+        }
+        Button("Verify…") { model.requestVerify(for: volume) }
+            .disabled(!volume.isMounted || volume.isReadOnly) // same rule as the toolbar
+        Button("Eject…") { Task { await model.act("Ejecting \(volume.name)…") { await $0.eject(volume) } } }
+        Divider()
+        Button("Erase…") { model.eraseTarget = volume }
+        Button("Reveal in Finder") {
+            if let mount = volume.mountPoint {
+                NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: mount)
+            }
         }
     }
 
@@ -176,17 +204,7 @@ struct VolumeDetail: View {
                         .disabled(model.busyLabel != nil)
                         .help("Make this volume's files visible (⌘M)")
                 }
-                Button("Verify") {
-                    verifying = true
-                    Task {
-                        let outcome = await model.store.verify(volume)
-                        verifyResult = switch outcome {
-                        case .passed(let line): line.isEmpty ? "No problems found." : line
-                        case .failed(let line): line
-                        }
-                        verifying = false
-                    }
-                }
+                Button("Verify") { verifyNow() }
                 .disabled(!volume.isMounted || volume.isReadOnly || model.busyLabel != nil)
                 .help(volume.isReadOnly
                       ? "Verify is unavailable for read-only media"
@@ -245,6 +263,30 @@ struct VolumeDetail: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(model.error ?? "")
+        }
+        // A verify requested from a row's context menu (S-043), possibly for
+        // this volume before it was even selected.
+        .onChange(of: model.verifyRequest) { _, request in claimVerify(request) }
+        .onAppear { claimVerify(model.verifyRequest) }
+    }
+
+    /// Runs the verify and shows the result sheet; the request counter is
+    /// zeroed first so onAppear and onChange can't both fire the run.
+    private func claimVerify(_ request: Int) {
+        guard request != 0 else { return }
+        model.verifyRequest = 0
+        verifyNow()
+    }
+
+    private func verifyNow() {
+        verifying = true
+        Task {
+            let outcome = await model.store.verify(volume)
+            verifyResult = switch outcome {
+            case .passed(let line): line.isEmpty ? "No problems found." : line
+            case .failed(let line): line
+            }
+            verifying = false
         }
     }
 
@@ -350,9 +392,14 @@ struct EraseSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.lg) {
             if running {
-                HStack(spacing: Space.sm) {
+                HStack(spacing: Space.lg) {
                     ProgressView()
-                    Text("Erasing \(name)…")
+                    VStack(alignment: .leading, spacing: Space.xs) {
+                        Text("Erasing \(name)…")
+                        Button("Cancel") { dismiss() }
+                            .disabled(true)
+                            .help("An erase cannot be interrupted or resumed")
+                    }
                 }
             } else {
                 HStack(alignment: .top, spacing: Space.md) {

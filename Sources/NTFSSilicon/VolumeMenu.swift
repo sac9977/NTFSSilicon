@@ -70,6 +70,13 @@ struct VolumeMenuRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack {
                     Text(volume.name)
+                    if volume.isBoot { // S-021: tag the boot volume's OS
+                        Text("macOS")
+                            .font(.caption2)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(.quaternary, in: Capsule())
+                    }
                     Spacer()
                     Text(volume.mountPoint != nil ? "\(VolumeRow.size(volume.freeBytes)) Free" : "Unmounted")
                         .font(.caption)
@@ -126,7 +133,10 @@ extension AppModel {
     func mountTarget(_ volume: VolumeInfo) async {
         let readOnly = options(for: volume).readOnly
         await act("Mounting \(volume.name)…") { store in
-            await MountVeto.allowing { await store.mount(volume, readOnly: readOnly) }
+            if UserDefaults.standard.bool(forKey: "mount.verifyFirst"), !volume.isMounted {
+                if case .failed(let line) = await store.verify(volume) { return line }
+            }
+            return await MountVeto.allowing { await store.mount(volume, readOnly: readOnly) }
         }
     }
 

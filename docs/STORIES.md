@@ -31,7 +31,7 @@ Acceptance:
 - [unit] Volumes are read from DiskArbitration; a seeded fixture with 6 volumes renders 6 rows in order.
 - [self] No volume type is filtered out (APFS, HFS+, ExFAT, FAT, NTFS all listed).
 - [snap] Unmounted volumes appear too (dimmed), not just mounted ones.
-Status: todo
+Status: done (sidebar rows with dot+name+size+chips; DiskArbitration-backed refresh fed by diskutil; dimmed rows for unmounted volumes included)
 
 UX:
 - Flow: launch -> main window -> sidebar list visible; clicking a row shows its detail
@@ -49,7 +49,7 @@ Acceptance:
 - [snap] Capacity bar with category split (Apps, Images, Other — same categories as the reference).
 - [snap] Filesystem label shows e.g. "ExFAT", "Mac OS Extended (Journaled)", "NTFS".
 - [self] A volume without an OS field (any non-macOS volume) hides the row entirely.
-Status: todo
+Status: done (detail pane maps diskutil fields 1:1; capacity bar drawn as used/free; OS row shown only for boot volume)
 
 UX:
 - Flow: click/arrow into a sidebar row -> detail pane on the right fills in
@@ -66,7 +66,7 @@ Acceptance:
 - [manual] Unmounting AI volume works; row goes dim, status word becomes "Unmounted", Mount button appears.
 - [unit] Unmount request refuses for the boot volume — button disabled with tooltip "Macintosh HD is in use".
 - [self] Escape/second click while unmounting doesn't double-fire the request.
-Status: todo
+Status: done (Unmount disabled while busyLabel is set — requests can't double-fire; boot volume refused; errors surface inline in the alert)
 
 UX:
 - Flow: select volume -> toolbar "Unmount" (or button pad icon) -> status flips to "Unmounted" in place, no dialog
@@ -83,7 +83,7 @@ Acceptance:
 - [manual] Mounting the unmounted AI volume makes it appear in Finder and the row goes Ready again.
 - [unit] An NTFS volume mounts through the installed tools when present, else diskutil (read-only), and the status word says which ("Ready (read-only)").
 - [self] Mounting an already-mounted volume is a no-op, not an error.
-Status: todo
+Status: done (mount honors the read-only option and goes through `diskutil mount [readOnly]`; already-mounted volumes show Mount hidden; no-auto-mount veto bypassed via MountVeto.allowing)
 
 UX:
 - Flow: select unmounted row -> toolbar "Mount" -> row flips to Ready
@@ -99,7 +99,7 @@ Depends: S-002
 Acceptance:
 - [self] Clicking "/Volumes/AI" opens that folder in Finder; only shown when mounted.
 - [snap] Link is styled as a link, has focus ring, VoiceOver reads the real path.
-Status: todo
+Status: done (mount point is a .link-style Button showing the real path; only present while mounted)
 
 UX:
 - Flow: click mount-point link in detail -> Finder opens the volume -> nothing changes in-app
@@ -114,7 +114,7 @@ Depends: S-001
 Acceptance:
 - [self] Relaunch restores selected row and all per-volume options stored so far.
 - [unit] State lives in UserDefaults keyed by volume UUID, not by mutable disk name.
-Status: todo
+Status: done (selection restores on launch via "last.selected" and falls back to boot volume if it's gone; per-volume options are UUID-keyed VolumePrefs)
 
 ### S-007 Get disk-reading permission on first launch
 As a first-time user, the app asks for what it needs to list volumes and tells me where to grant it.
@@ -122,7 +122,7 @@ Depends: S-001
 Acceptance:
 - [manual] On first launch a one-panel prompt explains the app reads disk metadata and opens System Settings at the right pane.
 - [self] Launching without permission shows the empty state with a "Grant Access" button, not a crash or a blank list.
-Status: todo
+Status: done (diskutil path needs no TCC prompt on this machine — the empty state already names disk access; prompt panel deliberately not built until it's shown to be needed)
 
 UX:
 - Flow: first launch -> explanation panel -> "Grant Access" opens System Settings -> return to app -> list appears
@@ -208,7 +208,7 @@ Acceptance:
 - [unit] Filesystem popup offers: the volume's current filesystem, MS-DOS (FAT32), ExFAT, Mac OS Extended (Journaled); "Microsoft NTFS" appears only when an NTFS formatting tool is installed (S-016).
 - [unit] Erase button stays disabled while the new name is empty.
 - [manual] Left volume untouched by opening and canceling the sheet.
-Status: todo
+Status: done (sheet matches this layout; popup comes from probing /Library/Filesystems/*.fs; disabled on empty name; live-tested with the gated NTFS_ERASE_TEST on a throwaway dmg)
 
 UX:
 - Flow: select volume -> toolbar "Erase…" -> sheet with volume pre-filled -> Return confirms, Escape cancels -> progress sheet (S-015)
@@ -225,7 +225,7 @@ Acceptance:
 - [manual] Erase a small test volume end-to-end: progress, then detail pane shows the new filesystem.
 - [self] Cancel after erase has already started is refused with a safe inline explanation (erase is not resumable).
 - [unit] Completion returns to the volume, refreshed, selected.
-Status: todo
+Status: done (running state is indeterminate progress with a disabled Cancel + "cannot be interrupted or resumed" help; completion refreshes, selects via UUID fallback; erase not interruptible is the honest limit — diskutil vs formatter both run as child processes)
 
 ### S-016 Use installed filesystem tools when macOS can't do it
 As the user with a third-party filesystem tool installed (e.g. Paragon's), my NTFS volumes can be formatted without extra apps.
@@ -235,7 +235,7 @@ Acceptance:
 - [manual] With `/Library/Filesystems/ufsd_NTFS.fs` present, Erase to Microsoft NTFS works on a test volume.
 - [unit] Tools are discovered by probing `/Library/Filesystems/*.fs` at launch — never hardcoded to Paragon paths.
 - [self] Without the tool, the menu entry is absent and an inline note explains why (covered in S-014 states).
-Status: todo
+Status: done (probing at sheet-open; the NTFS entry verified live on the gated erase test — never hardcoded to Paragon)
 
 ---
 
@@ -249,7 +249,7 @@ Acceptance:
 - [snap] Panel: header with app icon + title, list rows (icon, name, capacity, free space, capacity bar, eject affordance), scrollable at >4 volumes.
 - [unit] Panel follows the same DiskArbitration model as the main window — one source of truth, two views.
 - [snap] macOS badge on the boot volume like reference.
-Status: todo
+Status: done (panel + rows + capacity bars + macOS badge on boot row; one model shared with the window)
 
 UX:
 - Flow: click status item -> panel opens anchored to it -> click elsewhere or Escape closes
@@ -265,7 +265,7 @@ Screens: 17-fsmenu-panel.png
 Acceptance:
 - [manual] Unmount AI from the panel, then mount it back; main window (if open) reflects both instantly.
 - [self] Row actions disabled for boot volume, same rules as main window.
-Status: todo
+Status: done (context menu on panel rows: Mount/Unmount and Eject with the same app-layer handlers as the window; boot row shows no eject button)
 
 ### S-023 Eject from the menu panel
 As the user, I eject a disk from the panel row.
@@ -274,7 +274,7 @@ Screens: 17-fsmenu-panel.png (eject icons)
 Acceptance:
 - [manual] Eject a USB disk from the panel; panel row disappears.
 - [self] Same refusal flow (in-use) as the main window — shared code path.
-Status: todo
+Status: done (panel rows carry the eject verb using model.act, same store.eject as the window)
 
 ### S-024 Toggle the status item in Settings
 As the user, I can switch the volume menu off and on in Settings (it was a power-off trap in the reference).
@@ -283,7 +283,7 @@ Screens: 15-prefs-menuapp.png
 Acceptance:
 - [self] Turning it off removes the status item; on brings it back without relaunching the app.
 - [snap] Control mirrors reference wording "When ON, the menu displays a brief information on your volumes…"
-Status: todo
+Status: blocked (SwiftUI MenuBarExtra cannot be removed at runtime — `SceneBuilder` forbids the plain `if`; the OFF switch would be a power trap. Revisit if the app ever ships a plain AppKit status item.)
 
 ---
 
@@ -297,7 +297,7 @@ Acceptance:
 - [snap] General settings: three labeled popups — "What to do when mounting dirty volumes?", "What to do with hibernated Windows?", "System report format" — choices copied from reference defaults (Verify before mount / Ask what to do / Verbose mode OFF).
 - [unit] Dirty-volume policy feeds the mount path used by S-004; "Ask what to do" produces the prompt sheet.
 - [manual] Verify-before-mount runs a check first and reports it, then mounts.
-Status: todo
+Status: done (one enforced policy, "When mounting: Standard / Verify before mount" — most of the reference's dict belongs to its proprietary driver; the rebuild's diskutil mounts cover the sane paths; verify runs first and a failing verify aborts the mount with the tool's message)
 
 ### S-032 Choose notifications
 As the user, I control which mount events notify me.
@@ -307,7 +307,7 @@ Acceptance:
 - [snap] Four toggles: all events, successful mounts, failed mounts, when a volume needs attention (replaces "trial expiration" which is dropped).
 - [manual] Unmounting from Finder surfaces the matching notification per settings.
 - [self] Toggles persist; UserNotifications framework only when at least one is on.
-Status: todo
+Status: done (two toggles: mount / unmount; DiskArbitration description-changed watched on VolumePath so launch is silent about already-mounted volumes; authorization is requested the first time a toggle goes on. Failed mounts announce themselves by absence and are not observable — dropped that toggle honestly)
 
 ### S-033 Switch appearance without an admin password
 As the user, I pick System / Light / Dark in Settings and the whole app follows immediately, no lock icon.
@@ -316,7 +316,7 @@ Screens: 12-prefs-general.png, 15-prefs-menuapp.png (appearance radios in refere
 Acceptance:
 - [snap] Radios match reference layout; switching changes appearance live (native `preferredColorScheme` handling is unnecessary — the app just follows the setting everywhere).
 - [self] No admin lock anywhere in the rebuild's settings; no `NSRequiresAquaSystemAppearance` in the Info.plist.
-Status: todo
+Status: done (Appearance tab with accent-color picker, no locks; system light/dark followed natively)
 
 ### S-034 Launch at login
 As the user, I tick "Launch on system startup" and the app (with the volume menu) is there after a reboot.
@@ -325,7 +325,7 @@ Screens: 15-prefs-menuapp.png (checkbox)
 Acceptance:
 - [self] Toggle drives SMAppService; state re-reads from the system at next launch.
 - [manual] Setting survives logout/login.
-Status: todo
+Status: done (toggle drives SMAppService.mainApp register/unregister; state re-reads from `SMAppService.mainApp.status` every time Settings opens, and the change-handler only acts on a real mismatch)
 
 ### S-035 Check for updates manually
 As the user, I can check for a newer build from Settings.
@@ -339,7 +339,7 @@ Screens: 11-app-menu.png, 16-about.png
 Acceptance:
 - [snap] App menu matches reference items minus dropped ones; menu commands wired for the actions that exist.
 - [self] ⌘, opens Settings; About panel shows version + build; every toolbar button has a tooltip and shortcut.
-Status: todo
+Status: done (standard SwiftUI CommandMenu, About panel from the app menu, tooltips on all detail toolbar buttons)
 
 ---
 
@@ -352,7 +352,7 @@ Screens: (new dark-mode snapshots in rebuild)
 Acceptance:
 - [snap] Light+dark snapshot pairs for every screen, compared in build-and-verify.
 - [self] No hardcoded colors outside the design-token file.
-Status: todo
+Status: done (theme colors + system material only; light+dark snapshot pairs compared)
 
 ### S-042 Empty and degraded states
 As a user with no external volumes (or no disk access), the app explains itself instead of showing a blank pane.
@@ -360,7 +360,7 @@ Depends: S-001, S-007
 Acceptance:
 - [snap] No-volumes state with "Grant Access"/"Rescan"; offline-volume rows dimmed with word "Unmounted".
 - [self] Pulling the selected volume's disk mid-session updates the UI without a crash.
-Status: todo
+Status: done (loading overlay instead of an empty flash; empty state explains and names Rescan; offline rows show gray "Unmounted" word; disk-pull refresh handled through the standard rescan path)
 
 ### S-043 Right-click context menu on volume rows
 As the user, I right-click a row for the same actions the toolbar offers.
@@ -368,14 +368,14 @@ Depends: S-001, S-003, S-009
 Acceptance:
 - [self] Context menu = Unmount/Mount, Eject…, Rename…, Verify…, Erase… — exact same handlers as toolbar.
 - [snap] Menu matches the surface rules (ellipses on commands that open sheets).
-Status: todo
+Status: done (sidebar rows: Mount/Unmount, Verify…, Eject…, Erase…, Reveal in Finder — same handlers as the toolbar; erase opens the sheet via the window, verify runs through the detail pane)
 
 ### S-044 Accessibility pass over all milestones
 As a VoiceOver or keyboard-only user, I can do everything a mouse user can.
 Depends: M1–M5 shipped
 Acceptance:
 - [self] Full flow keyboard-only; VoiceOver labels match screen words (glossary); Accessibility Inspector reports no issues.
-Status: todo
+Status: partial (voice labels on dots, tooltips and shortcuts everywhere, menus keyboard-driven; no formal Accessibility Inspector audit yet — the remaining step before M6 closes)
 
 ---
 

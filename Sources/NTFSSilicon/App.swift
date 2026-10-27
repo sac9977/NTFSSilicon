@@ -62,7 +62,10 @@ extension AppModel {
         guard let volume = selected else { return }
         let readOnly = options(for: volume).readOnly
         await act("Mounting \(volume.name)…") { store in
-            await MountVeto.allowing { await store.mount(volume, readOnly: readOnly) }
+            if UserDefaults.standard.bool(forKey: "mount.verifyFirst"), !volume.isMounted {
+                if case .failed(let line) = await store.verify(volume) { return line }
+            }
+            return await MountVeto.allowing { await store.mount(volume, readOnly: readOnly) }
         }
     }
 
@@ -96,6 +99,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate()
         MountVeto.start()
+        Notifier.start()
     }
 
     // The volume menu exists with or without the main window.
