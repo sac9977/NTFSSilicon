@@ -212,3 +212,23 @@ func snapshotWholeDisk() {
     #expect(volume?.wholeDisk == "disk3")
     #expect(volume?.isBoot == true)
 }
+
+/// Erases for real — only when you point it at a scratch device:
+///   NTFS_ERASE_TEST=1 SCRATCH_DEVICE=disk9s1 swift test --scratch-path …/test-build
+/// The device must be a disposable volume (a 64 MB dmg image works).
+@Test("erase() erases a scratch volume as ExFAT and as NTFS",
+      .enabled(if: ProcessInfo.processInfo.environment["NTFS_ERASE_TEST"] == "1"))
+func eraseScratch() async throws {
+    let device = try #require(ProcessInfo.processInfo.environment["SCRATCH_DEVICE"])
+    let volume = VolumeInfo(device: device, name: "Scratch", mountPoint: "/Volumes/Scratch",
+                            filesystem: "ExFAT", totalBytes: nil, freeBytes: nil, uuid: nil,
+                            isReadOnly: false, isHidden: false, isBoot: false, wholeDisk: device)
+    let store = VolumeStore()
+    #expect(await store.erase(volume, as: .exfat, name: "Tester") == nil)
+    #expect(await store.erase(volume, as: .ntfs, name: "TesterNTFS") == nil)
+    // diskutil info can serve stale personalities for an unmounted device;
+    // mount the volume and read what the system actually resolves.
+    _ = await store.mount(volume)
+    let volumes = (try? await store.refresh()) ?? []
+    #expect(volumes.contains { $0.device == device && $0.filesystem.lowercased().contains("ntfs") })
+}

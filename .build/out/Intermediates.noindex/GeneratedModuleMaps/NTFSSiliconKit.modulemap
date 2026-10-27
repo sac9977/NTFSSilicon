@@ -1,4 +1,0 @@
-module NTFSSiliconKit {
-header "NTFSSiliconKit-Swift.h"
-export *
-}

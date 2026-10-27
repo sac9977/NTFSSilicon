@@ -11,6 +11,9 @@ final class AppModel {
     var selection: String?
     var error: String?
     var busyLabel: String?
+    /// False until the first refresh lands, so the sidebar shows a loading
+    /// state instead of flashing the empty view.
+    private(set) var loaded = false
     /// Settings reopens on the last tab. Test and snapshot runs leave it alone.
     var settingsTab: SettingsTab = SettingsTab(rawValue: UserDefaults.standard.string(forKey: "settings.tab") ?? "") ?? .general {
         didSet { if !Env.isOverridden { UserDefaults.standard.set(settingsTab.rawValue, forKey: "settings.tab") } }
@@ -27,6 +30,7 @@ final class AppModel {
         if selection == nil || selected == nil {
             selection = volumes.first { $0.isBoot }?.device ?? volumes.first?.device
         }
+        loaded = true
     }
 
     func options(for volume: VolumeInfo) -> VolumeOptions {

@@ -13,7 +13,10 @@ struct ContentView: View {
             }
             .navigationSplitViewColumnWidth(min: 240, ideal: 280)
             .overlay {
-                if model.volumes.isEmpty {
+                if !model.loaded {
+                    ProgressView("Reading volumes…")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if model.volumes.isEmpty {
                     ContentUnavailableView("No volumes", systemImage: "internaldrive",
                         description: Text("Rescan — or grant the app disk access in System Settings."))
                 }

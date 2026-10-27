@@ -19,7 +19,7 @@ struct VolumeMenuPanel: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: Space.xs) {
                 Image(systemName: "internaldrive.fill")
-                Text("NTFS-Silicon")
+                Text("NTFSSilicon")
                 Spacer()
                 Button {
                     Task { await model.refresh() }
@@ -99,6 +99,12 @@ struct VolumeMenuRow: View {
         .padding(.horizontal, Space.sm)
         .padding(.vertical, Space.xs)
         .contentShape(Rectangle())
+        .help("\(volume.name), \(volume.statusWord)\(volume.totalBytes.map { ", \(VolumeRow.size($0))" } ?? "") — click to open in the main window")
+        .onTapGesture {
+            model.selection = volume.device
+            NSApp.activate()
+            NSApp.windows.first { $0.canBecomeMain }?.makeKeyAndOrderFront(nil)
+        }
         .contextMenu {
             if volume.isMounted {
                 Button("Unmount") { Task { await model.unmountTarget(volume) } }
@@ -107,7 +113,7 @@ struct VolumeMenuRow: View {
             }
             Button("Eject…") { Task { await model.act("Ejecting \(volume.name)…") { await $0.eject(volume) } } }
             Divider()
-            Button("Open NTFS-Silicon") {
+            Button("Open NTFSSilicon") {
                 NSApp.activate()
                 NSApp.windows.first { $0.canBecomeMain }?.makeKeyAndOrderFront(nil)
             }

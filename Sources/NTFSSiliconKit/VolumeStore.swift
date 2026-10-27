@@ -157,7 +157,9 @@ public final class VolumeStore: Sendable {
             return "No NTFS formatter is installed."
         }
         if let unmountError = await unmount(volume) { return unmountError }
-        let (code, out) = await runTool(formatter, ["-v", trimmed, "/dev/\(volume.device)"])
+        // The formatter asks "Proceed with Format (y/n)?" before doing
+        // anything, and aborts silently with exit 0 on EOF — answer yes.
+        let (code, out) = await runTool(formatter, ["-v", trimmed, "/dev/\(volume.device)"], stdin: "y\n")
         return code == 0 ? nil : errorMessage(out, verb: "erase")
     }
 
@@ -186,13 +188,20 @@ public final class VolumeStore: Sendable {
         return lines.last ?? ""
     }
 
-    /// Runs a tool and returns exit code + combined output.
-    func runTool(_ path: String, _ arguments: [String]) async -> (Int32, String) {
+    /// Runs a tool and returns exit code + combined output. `stdin` feeds the
+    /// tool's standard input (the NTFS formatter asks y/n before formatting).
+    func runTool(_ path: String, _ arguments: [String], stdin: String? = nil) async -> (Int32, String) {
         await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
                 let process = Process()
                 process.executableURL = URL(fileURLWithPath: path)
                 process.arguments = arguments
+                if let stdin {
+                    let input = Pipe()
+                    process.standardInput = input
+                    input.fileHandleForWriting.write(Data(stdin.utf8))
+                    input.fileHandleForWriting.closeFile()
+                }
                 let pipe = Pipe()
                 process.standardOutput = pipe
                 process.standardError = pipe
