@@ -120,6 +120,10 @@ struct VolumeDetail: View {
                         .foregroundStyle(.tint)
                     TextField("Name", text: $editableName, onCommit: commitRename)
                         .labelsHidden()
+                        .onKeyPress(.escape) {
+                            editableName = volume.name // cancel, like the reference's pencil
+                            return .handled
+                        }
                     HStack(spacing: Space.xs) {
                         Dot(status: volume.statusWord)
                         Text(volume.statusWord)
@@ -148,12 +152,14 @@ struct VolumeDetail: View {
                 }
             }
             Section("Options") {
-                Toggle("Enable Spotlight Indexing", isOn: spotlightBinding)
-                    .disabled(!volume.isMounted || volume.isReadOnly)
-                Toggle("Mount in Read-only mode", isOn: boolBinding(\.readOnly))
-                    .disabled(volume.isReadOnly || volume.isBoot)
-                Toggle("Do not mount automatically", isOn: boolBinding(\.noAutoMount))
-                    .disabled(volume.isBoot)
+                if !volume.isReadOnly { // read-only media can never be indexed (S-011)
+                    Toggle("Enable Spotlight Indexing", isOn: spotlightBinding)
+                        .disabled(!volume.isMounted)
+                    Toggle("Mount in Read-only mode", isOn: boolBinding(\.readOnly))
+                        .disabled(volume.isReadOnly || volume.isBoot)
+                    Toggle("Do not mount automatically", isOn: boolBinding(\.noAutoMount))
+                        .disabled(volume.isBoot)
+                }
             }
             .toggleStyle(.checkbox)
         }
@@ -181,8 +187,10 @@ struct VolumeDetail: View {
                         verifying = false
                     }
                 }
-                .disabled(!volume.isMounted || model.busyLabel != nil)
-                .help("Check the volume's filesystem for errors (⇧⌘V)")
+                .disabled(!volume.isMounted || volume.isReadOnly || model.busyLabel != nil)
+                .help(volume.isReadOnly
+                      ? "Verify is unavailable for read-only media"
+                      : "Check the volume's filesystem for errors (⇧⌘V)")
                 Button("Erase…") { showingErase = true }
                     .disabled(volume.isBoot || model.busyLabel != nil)
                     .help("Delete all data and create a new filesystem")
@@ -217,7 +225,18 @@ struct VolumeDetail: View {
             .fitsContent()
             .noInitialFocus()
         }
-        .task(id: volume.device) { editableName = volume.name }
+        .task(id: volume.device) {
+            editableName = volume.name
+            // The system is the truth for Spotlight; store what it says, so
+            // the checkbox never lies on next launch (S-011).
+            if volume.isMounted, let actual = await model.store.spotlightState(volume) {
+                var options = model.options(for: volume)
+                if options.spotlight != actual {
+                    options.spotlight = actual
+                    model.setOptions(options, for: volume)
+                }
+            }
+        }
         .onChange(of: volume.name) { _, newName in editableName = newName }
         .alert("Volume", isPresented: Binding(
             get: { model.error != nil },

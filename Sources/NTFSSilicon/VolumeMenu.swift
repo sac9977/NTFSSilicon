@@ -124,7 +124,10 @@ struct VolumeMenuRow: View {
 extension AppModel {
     @MainActor
     func mountTarget(_ volume: VolumeInfo) async {
-        await act("Mounting \(volume.name)…") { await $0.mount(volume) }
+        let readOnly = options(for: volume).readOnly
+        await act("Mounting \(volume.name)…") { store in
+            await MountVeto.allowing { await store.mount(volume, readOnly: readOnly) }
+        }
     }
 
     @MainActor

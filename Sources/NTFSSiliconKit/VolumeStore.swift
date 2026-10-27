@@ -72,8 +72,11 @@ public final class VolumeStore: Sendable {
 
     // MARK: - Actions
 
-    public func mount(_ volume: VolumeInfo) async -> String? {
-        let (code, out) = await runTool(diskutil, ["mount", volume.device])
+    public func mount(_ volume: VolumeInfo, readOnly: Bool = false) async -> String? {
+        var arguments = ["mount"]
+        if readOnly { arguments.append("readOnly") } // native: `diskutil mount readOnly`
+        arguments.append(volume.device)
+        let (code, out) = await runTool(diskutil, arguments)
         return code == 0 ? nil : errorMessage(out, verb: "mount")
     }
 
@@ -167,6 +170,22 @@ public final class VolumeStore: Sendable {
         guard let mountPoint = volume.mountPoint else { return "The volume is not mounted." }
         let (code, out) = await runTool("/usr/sbin/mdutil", ["-i", on ? "on" : "off", mountPoint])
         return code == 0 ? nil : errorMessage(out, verb: "set Spotlight indexing")
+    }
+
+    /// The system's actual Spotlight state for a mounted volume, parsed
+    /// from `mdutil -s`: "Indexing enabled." / "disabled." / "off."
+    /// nil when the volume is not mounted or the output makes no sense.
+    public func spotlightState(_ volume: VolumeInfo) async -> Bool? {
+        guard let mountPoint = volume.mountPoint else { return nil }
+        let (_, out) = await runTool("/usr/sbin/mdutil", ["-s", mountPoint])
+        return Self.parseSpotlight(out)
+    }
+
+    public static func parseSpotlight(_ output: String) -> Bool? {
+        let lowered = output.lowercased()
+        if lowered.contains("indexing enabled") { return true }
+        if lowered.contains("indexing disabled") || lowered.contains("indexing off") { return false }
+        return nil
     }
 
     // MARK: - Internals

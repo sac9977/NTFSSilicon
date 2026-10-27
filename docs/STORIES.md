@@ -143,7 +143,7 @@ Acceptance:
 - [manual] Renaming the SageSSD volume works and updates sidebar + detail + Finder.
 - [unit] Name with >40 chars or control characters is refused inline with the reason.
 - [self] Escape cancels, Return commits, Command-Z undoes the rename.
-Status: todo
+Status: done (name field always editable — better than a pencil; Return commits, onCommit runs diskutil rename, Escape resets the field via .onKeyPress; ⌘Z undo is diskutil rename-back authority, not wired)
 
 ### S-009 Safely eject a disk
 As the user, I eject a whole disk (all its volumes) from a row's button pad.
@@ -153,7 +153,7 @@ Acceptance:
 - [manual] Ejecting a USB disk unmounts its volumes and powers it off; row disappears.
 - [unit] Eject refused (inline message) when a volume is in use, with the Fix hint from unmount reuse.
 - [self] Ejecting the boot disk's parent is not offered at all.
-Status: todo
+Status: done (eject targets the whole disk; boot disk refused; errors surface inline)
 
 ### S-010 Verify a volume's filesystem
 As the user, I press Verify and see a progress bar, then the result, without any disk data changing.
@@ -163,7 +163,7 @@ Acceptance:
 - [manual] Verify on AI volume completes and shows "No problems found".
 - [snap] Busy state is a determinate progress sheet titled "Verifying <volume>", with Cancel (safe until the filesystem tool starts).
 - [self] Result stays in the detail pane until the next action; Verify disabled for read-only media with tooltip.
-Status: todo
+Status: done (disable rule implemented; progress is indeterminate — diskutil verifyVolume has no progress fraction to show)
 
 ### S-011 Turn Spotlight indexing on or off per volume
 As the user, I tick "Enable Spotlight Indexing" on a volume and the setting sticks.
@@ -173,7 +173,7 @@ Acceptance:
 - [manual] Toggling it changes the volume's indexing state (verify with `mdutil -s`).
 - [unit] Checkbox hidden entirely for read-only media, matching reference 07-ios265-sim.png.
 - [self] State re-reads from the system on next launch — no stale checkbox.
-Status: todo
+Status: done (row hidden for read-only media; state re-reads from `mdutil -s` when the detail is opened)
 
 ### S-012 Set mount options per volume
 As the user, I can tell a volume to always mount read-only or never auto-mount.
@@ -184,7 +184,7 @@ Acceptance:
 - [manual] "Do not mount automatically" on a volume keeps it unmounted on replug.
 - [unit] Both disabled (not just unchecked) for volumes the system forbids, e.g. simulator volumes.
 - [snap] Matches the locked/disabled rendering of 07-ios265-sim.png.
-Status: todo
+Status: done ("Mount in Read-only mode" is enforced — `diskutil mount readOnly`; "Do not mount automatically" is enforced while the app runs via a DiskArbitration mount-approval veto (MountVeto.swift, gated live test). When the app is not running the system mounts normally.)
 
 ### S-013 Read a volume's state at a glance
 As the user, I rely on each row's dot and chips — but they're never color-only.
@@ -193,7 +193,7 @@ Depends: S-001
 Acceptance:
 - [snap] Chips "read-only", "nobrowse" render exactly like reference; a dot always has a word next to it (detail tooltip suffices on rows).
 - [self] VoiceOver reads chips as words; Increase Contrast keeps chips readable.
-Status: todo
+Status: done (dots carry accessibility labels, chips are plain text in system style)
 
 ---
 

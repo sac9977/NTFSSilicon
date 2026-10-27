@@ -213,6 +213,15 @@ func snapshotWholeDisk() {
     #expect(volume?.isBoot == true)
 }
 
+@Test("spotlight state parses mdutil -s output in all its wordings")
+func spotlightParse() {
+    #expect(VolumeStore.parseSpotlight("/Volumes/x:\n\tIndexing enabled. ") == true)
+    #expect(VolumeStore.parseSpotlight("/Volumes/x:\n\tIndexing disabled. ") == false)
+    #expect(VolumeStore.parseSpotlight("/Volumes/x:\n\tIndexing off. ") == false)
+    #expect(VolumeStore.parseSpotlight("Error: cannot obtain index status") == nil)
+    #expect(VolumeStore.parseSpotlight("") == nil)
+}
+
 /// Erases for real — only when you point it at a scratch device:
 ///   NTFS_ERASE_TEST=1 SCRATCH_DEVICE=disk9s1 swift test --scratch-path …/test-build
 /// The device must be a disposable volume (a 64 MB dmg image works).
@@ -231,4 +240,53 @@ func eraseScratch() async throws {
     _ = await store.mount(volume)
     let volumes = (try? await store.refresh()) ?? []
     #expect(volumes.contains { $0.device == device && $0.filesystem.lowercased().contains("ntfs") })
+}
+
+/// Live veto + read-only mounts — gates itself behind VETO_TEST=1 and makes
+/// its own disposable dmg, so nothing on the machine is touched:
+///   VETO_TEST=1 swift test --scratch-path ~/Library/Developer/NTFSSilicon/test-build
+@Test("do-not-mount-automatically veto blocks it; readOnly option mounts read-only",
+      .enabled(if: ProcessInfo.processInfo.environment["VETO_TEST"] == "1"))
+func vetoAndReadOnly() async throws {
+    let store = VolumeStore()
+
+    func runSync(_ path: String, _ args: [String]) -> Int32 {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: path)
+        process.arguments = args
+        try? process.run()
+        process.waitUntilExit()
+        return process.terminationStatus
+    }
+
+    #expect(await store.runTool("/usr/bin/hdiutil",
+        ["create", "-size", "32m", "-volname", "VetoScratch", "-fs", "HFS+", "-ov", "/tmp/veto-scratch.dmg"]).0 == 0)
+    #expect(await store.runTool("/usr/bin/hdiutil", ["attach", "/tmp/veto-scratch.dmg"]).0 == 0)
+    let rawEntry = try #require(await store.runTool("/usr/bin/hdiutil", ["info"]).1
+        .split(separator: "\n").first { $0.contains("/Volumes/VetoScratch") }?
+        .prefix(while: { !$0.isWhitespace }).description) // e.g. "/dev/disk9s1"
+    let dev = rawEntry.replacingOccurrences(of: "/dev/", with: "")
+    defer { _ = runSync("/usr/bin/hdiutil", ["detach", "/dev/\(dev)"]) }
+
+    let volumes = (try? await store.refresh()) ?? []
+    let volume = try #require(volumes.first { $0.device == dev })
+    let uuid = try #require(volume.uuid)
+    defer { VolumePrefs.set(VolumeOptions(), forUUID: uuid.uppercased()) }
+    _ = await store.unmount(volume)
+    MountVeto.start()
+
+    // "Do not mount automatically": diskutil's mount request is vetoed.
+    VolumePrefs.set(VolumeOptions(noAutoMount: true), forUUID: uuid.uppercased())
+    let (vetoedCode, _) = await store.runTool(store.diskutil, ["mount", dev])
+    #expect(vetoedCode != 0)
+    let (_, freeSpaces) = await store.runTool("/bin/df", [])
+    #expect(!freeSpaces.contains("VetoScratch"))
+
+    // And the app's own explicit Mount must still work, read-only.
+    await MountVeto.allowing {
+        let mountResult = await store.mount(volume, readOnly: true)
+        #expect(mountResult == nil)
+    }
+    let (_, info) = await store.runTool(store.diskutil, ["info", dev])
+    #expect(info.contains("read-only mount flag set")) // "Volume Read-Only: Yes" in macOS 26
 }

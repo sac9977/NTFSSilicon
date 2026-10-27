@@ -1,4 +1,5 @@
 import AppKit
+import NTFSSiliconKit
 import SwiftUI
 
 // NTFSSilicon — a native volume manager.
@@ -59,7 +60,10 @@ extension AppModel {
     @MainActor
     func mountSelected() async {
         guard let volume = selected else { return }
-        await act("Mounting \(volume.name)…") { await $0.mount(volume) }
+        let readOnly = options(for: volume).readOnly
+        await act("Mounting \(volume.name)…") { store in
+            await MountVeto.allowing { await store.mount(volume, readOnly: readOnly) }
+        }
     }
 
     @MainActor
@@ -91,6 +95,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Started from a terminal, the process is not a foreground app yet.
         NSApp.setActivationPolicy(.regular)
         NSApp.activate()
+        MountVeto.start()
     }
 
     // The volume menu exists with or without the main window.
