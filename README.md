@@ -32,6 +32,16 @@ filesystem tools are already installed on the machine.
 - **Settings** — accent color, launch at login via `SMAppService`,
   standard ⌘, / About panel.
 
+## Screenshots
+
+| Light | Dark |
+|---|---|
+| ![Main window, light](docs/shots/volumes-light.png) | ![Main window, dark](docs/shots/volumes-dark.png) |
+| ![Settings · General, light](docs/shots/settings-general-light.png) | ![Settings · General, dark](docs/shots/settings-general-dark.png) |
+| ![Settings · Appearance, light](docs/shots/settings-appearance-light.png) | ![Settings · Appearance, dark](docs/shots/settings-appearance-dark.png) |
+
+Regenerate with `tools/snap.sh`.
+
 ## Requirements
 
 - macOS 26+, Apple Silicon, Xcode with the macOS 27 SDK
