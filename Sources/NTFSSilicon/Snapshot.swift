@@ -1,5 +1,6 @@
 import AppKit
 import IOKit.pwr_mgt
+import NTFSSiliconKit
 import SwiftUI
 
 /// Screenshot mode for agents.
@@ -8,6 +9,37 @@ import SwiftUI
 /// tab, plus <page>-<mode>-layout.json grid probes, then quits.
 /// APP_SNAPSHOT_PAGES=limits,to,these (default all). APP_ACCENT switches accent.
 enum Snapshot {
+    /// Six stand-in volumes spanning the states the UI must render: boot
+    /// (read-only), mounted NTFS with the detail shown, mounted APFS,
+    /// mounted HFS+ with per-volume prefs defaults, unmounted, read-only
+    /// media. Only synthetic data ever reaches a screenshot.
+    static let fixtureVolumes: [VolumeInfo] = [
+        VolumeInfo(device: "disk0s1", name: "Macintosh HD", mountPoint: "/",
+                   filesystem: "APFS", totalBytes: 994_663_587_840, freeBytes: 41_000_000_000,
+                   uuid: "0000-BOOT-0000", isReadOnly: true, isHidden: false, isBoot: true,
+                   wholeDisk: "disk0"),
+        VolumeInfo(device: "disk3s2", name: "Sandbox", mountPoint: "/Volumes/Sandbox",
+                   filesystem: "NTFS", totalBytes: 2_000_247_524_352, freeBytes: 512_000_000_000,
+                   uuid: "0000-SNDB-0000", isReadOnly: false, isHidden: false, isBoot: false,
+                   wholeDisk: "disk3"),
+        VolumeInfo(device: "disk1s1", name: "Work", mountPoint: "/Volumes/Work",
+                   filesystem: "APFS", totalBytes: 1_000_000_000_000, freeBytes: 250_000_000_000,
+                   uuid: "0000-WRK0-0000", isReadOnly: false, isHidden: false, isBoot: false,
+                   wholeDisk: "disk1"),
+        VolumeInfo(device: "disk2s2", name: "Archive", mountPoint: "/Volumes/Archive",
+                   filesystem: "Mac OS Extended (Journaled)", totalBytes: 701_800_000_000,
+                   freeBytes: 700_100_000_000, uuid: "0000-ARCH-0000", isReadOnly: false,
+                   isHidden: false, isBoot: false, wholeDisk: "disk2"),
+        VolumeInfo(device: "disk4s1", name: "Installers", mountPoint: nil,
+                   filesystem: "exFAT", totalBytes: 128_000_000_000, freeBytes: nil,
+                   uuid: "0000-INST-0000", isReadOnly: false, isHidden: true, isBoot: false,
+                   wholeDisk: "disk4"),
+        VolumeInfo(device: "disk5s1", name: "Sim Images", mountPoint: "/Volumes/Sim Images",
+                   filesystem: "ISO 9660", totalBytes: 8_000_000_000, freeBytes: 0,
+                   uuid: nil, isReadOnly: true, isHidden: true, isBoot: false,
+                   wholeDisk: "disk5"),
+    ]
+
     static func runIfRequested(model: AppModel, openSettings: OpenSettingsAction) {
         let env = ProcessInfo.processInfo.environment
         guard let dir = env["APP_SNAPSHOT"], !dir.isEmpty else { return }
@@ -29,7 +61,10 @@ enum Snapshot {
             try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
             try? await Task.sleep(for: .seconds(1.5))
             await model.refresh()
-            // Select a non-boot volume when one exists, so the detail pane is dark-navy interesting.
+            // Privacy: publish no real volume names, sizes or devices —
+            // rendering uses a fixed fixture from here on.
+            model.volumes = Self.fixtureVolumes
+            // Select a non-boot volume, so the detail pane is interesting.
             if let detail = model.volumes.first(where: { !$0.isBoot }) { model.selection = detail.device }
             for mode in ["light", "dark"] {
                 NSApp.appearance = NSAppearance(named: mode == "light" ? .aqua : .darkAqua)
