@@ -54,6 +54,8 @@ swift test --scratch-path ~/Library/Developer/NTFSSilicon/test-build
 tools/selftest.sh  # real-machine checks (needs APP_STORE=/tmp)
 tools/snap.sh      # light+dark screenshots to /tmp/NTFSSilicon-shots
 tools/make-dmg.sh  # signed drag-to-install disk image at dist/NTFSSilicon.dmg
+# With a Developer ID Application cert and a NOTARY notarytool profile, the
+# dmg is automatically notarized and stapled so other Macs open it cleanly.
 ```
 
 Two live hardware tests are gated so CI and casual runs stay local-only —

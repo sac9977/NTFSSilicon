@@ -44,11 +44,11 @@ codesign --verify --strict "$mnt/$name.app"
 hdiutil detach "$mnt" >/dev/null 2>&1
 
 # Notarize + staple when both the cert and the stored profile exist.
-if [[ -n "$devid" ]] && security find-generic-password -s NOTARY >/dev/null 2>&1; then
-  xcrun notarytool submit "$out" --keychain-profile NOTARY --wait
+if [[ -n "$devid" ]] && xcrun notarytool history --keychain-profile NOTARY >/dev/null 2>&1; then
+  xcrun notarytool submit "$out" --keychain-profile NOTARY --wait --timeout 60m
   xcrun stapler staple "$out"
   codesign --verify --strict --verbose=1 "$app"
-  spctl assess -vv --type install "$out"
+  xcrun stapler validate "$out"   # authoritative check for dmg containers
   echo "notarized+stapled: $out"
 fi
 
