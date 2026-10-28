@@ -116,4 +116,7 @@ enum Env {
     static var isOverridden: Bool {
         !(ProcessInfo.processInfo.environment["APP_STORE"] ?? "").isEmpty
     }
+    static var overridePath: String {
+        ProcessInfo.processInfo.environment["APP_STORE"] ?? ""
+    }
 }

@@ -73,6 +73,7 @@ public final class VolumeStore: Sendable {
     // MARK: - Actions
 
     public func mount(_ volume: VolumeInfo, readOnly: Bool = false) async -> String? {
+        if let refusal = await refuseBoot(volume, verb: "mounted") { return refusal }
         var arguments = ["mount"]
         if readOnly { arguments.append("readOnly") } // native: `diskutil mount readOnly`
         arguments.append(volume.device)
@@ -81,12 +82,13 @@ public final class VolumeStore: Sendable {
     }
 
     public func unmount(_ volume: VolumeInfo) async -> String? {
+        if let refusal = await refuseBoot(volume, verb: "unmounted") { return refusal }
         let (code, out) = await runTool(diskutil, ["unmount", volume.device])
         return code == 0 ? nil : errorMessage(out, verb: "unmount")
     }
 
     public func eject(_ volume: VolumeInfo) async -> String? {
-        guard !isBootDisk(volume) else { return "The boot disk can't be ejected." }
+        if let refusal = await refuseBoot(volume, verb: "ejected") { return refusal }
         let (code, out) = await runTool(diskutil, ["eject", volume.wholeDisk])
         return code == 0 ? nil : errorMessage(out, verb: "eject")
     }
@@ -97,6 +99,7 @@ public final class VolumeStore: Sendable {
               trimmed.rangeOfCharacter(from: .controlCharacters) == nil else {
             return "Volume names can be 1–40 characters, no control characters."
         }
+        if let refusal = await refuseBoot(volume, verb: "renamed") { return refusal }
         let (code, out) = await runTool(diskutil, ["rename", volume.device, trimmed])
         return code == 0 ? nil : errorMessage(out, verb: "rename")
     }
@@ -192,6 +195,28 @@ public final class VolumeStore: Sendable {
 
     public func isBootDisk(_ volume: VolumeInfo) -> Bool {
         volume.isBoot || volume.mountPoint == "/"
+    }
+
+    /// Mutating verbs call this. Beyond `isBootDisk`, it refuses every volume
+    /// of the container "/" boots from, because the mutable system volume
+    /// (sealed twin, e.g. disk3s1) is *not* "/" — the mounted snapshot is —
+    /// and a stale device id once renamed it (the S-044 incident).
+    private func refuseBoot(_ volume: VolumeInfo, verb: String) async -> String? {
+        guard !isBootDisk(volume) else { return "The boot volume can't be \(verb)." }
+        if let root = await rootWholeDisk(), volume.wholeDisk == root {
+            return "The boot volume can't be \(verb)."
+        }
+        return nil
+    }
+
+    /// The whole disk "/" is mounted from, e.g. disk3s1s1 → disk3.
+    public func rootWholeDisk() async -> String? {
+        let (_, out) = await runTool("/sbin/mount", [])
+        let line = out.split(separator: "\n").first { $0.contains(" on / ") } ?? ""
+        guard let device = line.split(separator: " ").first.map(String.init),
+              device.hasPrefix("/dev/"),
+              let match = device.firstMatch(of: /disk\d+/) else { return nil }
+        return String(match.output)
     }
 
     private func errorMessage(_ out: String, verb: String) -> String {

@@ -307,7 +307,7 @@ Acceptance:
 - [snap] Four toggles: all events, successful mounts, failed mounts, when a volume needs attention (replaces "trial expiration" which is dropped).
 - [manual] Unmounting from Finder surfaces the matching notification per settings.
 - [self] Toggles persist; UserNotifications framework only when at least one is on.
-Status: done (two toggles: mount / unmount; DiskArbitration description-changed watched on VolumePath so launch is silent about already-mounted volumes; authorization is requested the first time a toggle goes on. Failed mounts announce themselves by absence and are not observable — dropped that toggle honestly)
+Status: mostly verified — toggles persist; authorization is requested when a toggle goes on. Pending runtime proof: the macOS notification prompt has never been answered for this bundle (ncprefs has no record), so the banner-on-mount handoff still needs one real Allow + a real mount to confirm (user to click; postponed — user was mid-assessment when re-testing).
 
 ### S-033 Switch appearance without an admin password
 As the user, I pick System / Light / Dark in Settings and the whole app follows immediately, no lock icon.
@@ -375,7 +375,8 @@ As a VoiceOver or keyboard-only user, I can do everything a mouse user can.
 Depends: M1–M5 shipped
 Acceptance:
 - [self] Full flow keyboard-only; VoiceOver labels match screen words (glossary); Accessibility Inspector reports no issues.
-Status: partial — automated part done (selftest walks the real AX tree and fails on any interactive control with no title/description/help/value — traffic-light window chrome exempted by subrole; currently 0 silent controls). A hands-on VoiceOver + Accessibility Inspector session is the remaining step.
+Status: partial — automated part done (selftest walks the real AX tree and fails on any interactive control with no title/description/help/value — traffic-light window chrome exempted by subrole; last clean result 0 silent controls). A hands-on VoiceOver + Accessibility Inspector session is the remaining step.
+Incident (2026-10-28): during the hands-on keyboard flow with throwaway scratch volumes, a stale device id let a rename/mount flow address the real boot volume; "Macintosh HD" ended up renamed to "ScratchFlow" (name restored the same day — renaming the booted snapshot device `disk3s1s1` forwards to the underlying mutable volume). Root cause fixed in code: `VolumeStore` mutating verbs (mount/unmount/eject/rename/erase) now refuse every volume of the "/" container, even when the mutable sealed twin is not "/" (refuseBoot + rootWholeDisk); selftest proves the refusal with a nonexistent ghost device id so a guard regression can't damage data. Keyboard nav itself was demonstrated before the incident: arrows move sidebar selection once the outline holds focus, ⌘M fires a real mount action on a scratch volume.
 
 ---
 

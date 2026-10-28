@@ -12,6 +12,7 @@ enum SelfTest {
     static var exitCode: Int32 = 0
     private static var failures = 0
     private static var count = 0
+    private static var log: [String] = []
 
     static func runIfRequested(model: AppModel) {
         guard requested else { return }
@@ -33,6 +34,26 @@ enum SelfTest {
             if let first = model.volumes.first {
                 model.selection = first.device
                 check("selecting a volume works", model.selected?.device == first.device)
+            }
+            // The S-044 incident guard: mutating verbs refuse every volume of
+            // the "/" container even when the stale device id points at the
+            // unmounted sealed twin. The fake device id is deliberately
+            // nonexistent, so if the guard ever regresses, diskutil just
+            // errors on it and the machine is untouched.
+            let store = VolumeStore()
+            let rootDisk = await store.rootWholeDisk()
+            if let rootDisk {
+                let ghost = VolumeInfo(device: rootDisk + "9s9", name: "guard-test",
+                                       mountPoint: nil, filesystem: "APFS",
+                                       totalBytes: nil, freeBytes: nil, uuid: nil,
+                                       isReadOnly: false, isHidden: false,
+                                       isBoot: false, wholeDisk: rootDisk)
+                check("boot-container ghost refuses rename", await store.rename(ghost, to: "Q")?.contains("boot") == true)
+                check("boot-container ghost refuses mount", await store.mount(ghost)?.contains("boot") == true)
+                check("boot-container ghost refuses unmount", await store.unmount(ghost)?.contains("boot") == true)
+                check("boot-container ghost refuses eject", await store.eject(ghost)?.contains("boot") == true)
+            } else {
+                check("root whole disk resolves", false)
             }
             // Options round-trip on an untouched UserDefaults suite.
             let testDefaults = UserDefaults(suiteName: "selftest.volume.prefs")
@@ -66,6 +87,12 @@ enum SelfTest {
                 check("every control answers with a word (S-044)", false, "no AX window")
             }
 
+            // Headless agents exec this binary without a window server, so
+            // stdout can be unreadable — mirror the result next to the
+            // APP_STORE fixture dir for `open`-launched runs.
+            try? ((log + [failures == 0 ? "PASS \(count)" : "FAIL \(failures)/\(count)"]).joined(separator: "\n"))
+                .write(toFile: Env.overridePath.appending("/selftest-result.txt"), atomically: true, encoding: .utf8)
+
             print(failures == 0 ? "SELFTEST PASS \(count) checks" : "SELFTEST FAIL \(failures) of \(count) checks")
             finish(code: failures == 0 ? 0 : 1)
         }
@@ -74,7 +101,9 @@ enum SelfTest {
     private static func check(_ name: String, _ ok: Bool, _ detail: String = "") {
         count += 1
         if !ok { failures += 1 }
-        print(ok ? "PASS \(name)" : "FAIL \(name)\(detail.isEmpty ? "" : ": \(detail)")")
+        let line = ok ? "PASS \(name)" : "FAIL \(name)\(detail.isEmpty ? "" : ": \(detail)")"
+        print(line)
+        log.append(line)
     }
 
     // MARK: Accessibility audit (S-044)
