@@ -1,5 +1,6 @@
 import DiskArbitration
 import UserNotifications
+import os
 
 /// Posts user notifications when volumes mount/unmount, per the two Alerts
 /// toggles in Settings (S-032). The DiskArbitration description-changed
@@ -17,7 +18,12 @@ final class Notifier: @unchecked Sendable {
     /// an alert toggle on; turning all off leaves the grant alone.
     static func enabled(_ on: Bool) {
         guard on else { return }
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert]) { _, _ in }
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert]) { granted, error in
+            // Authorized state is otherwise invisible (no TCC access, no
+            // ncprefs record until answered); log the answer for diagnosis.
+            Logger(subsystem: "com.saslu.ntfssilicon", category: "Notifier")
+                .notice("notifications granted=\(granted) error=\(String(describing: error ?? nil))")
+        }
     }
 
     static func start() {

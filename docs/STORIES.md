@@ -307,7 +307,7 @@ Acceptance:
 - [snap] Four toggles: all events, successful mounts, failed mounts, when a volume needs attention (replaces "trial expiration" which is dropped).
 - [manual] Unmounting from Finder surfaces the matching notification per settings.
 - [self] Toggles persist; UserNotifications framework only when at least one is on.
-Status: mostly verified — toggles persist; authorization is requested when a toggle goes on. Pending runtime proof: the macOS notification prompt has never been answered for this bundle (ncprefs has no record), so the banner-on-mount handoff still needs one real Allow + a real mount to confirm (user to click; postponed — user was mid-assessment when re-testing).
+Status: **done** — mount and unmount both verified at runtime with banners (2026-10-28): a throwaway dmg attach surfaced "ProofBanner mounted." and its eject "ProofBanner unmounted.", both captured on screen. Discovery along the way: the system had this app's notifications **denied** (a prompt from an earlier session went unanswered → denied silently; `requestAuthorization` then returns false with no UI). Fix for users: System Settings → Notifications → allow. App-side toggles verified: mount/unmount switches persist and only authorized state gates the banner; unmount toggle was flipped on for the test and left on.
 
 ### S-033 Switch appearance without an admin password
 As the user, I pick System / Light / Dark in Settings and the whole app follows immediately, no lock icon.
