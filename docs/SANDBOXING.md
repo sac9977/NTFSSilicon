@@ -34,6 +34,10 @@ mount control, verify, erase, Spotlight, rename) is Developer-ID-only.
 
 ## Recommended release shape
 
+**Decision (2026-10-28): skip the App Store.** The full app ships direct
+via the notarized Developer-ID DMG. Point of sale and updates are a plain
+website (Sparkle stays in Later) — no viewer edition gets built unless
+that decision changes.
 1. **Direct + notarized (Developer ID)** — the full app you already have:
    `tools/make-dmg.sh` produces it today. This is a release, no feature
    parity needed.
