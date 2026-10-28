@@ -143,7 +143,7 @@ Acceptance:
 - [manual] Renaming the SageSSD volume works and updates sidebar + detail + Finder.
 - [unit] Name with >40 chars or control characters is refused inline with the reason.
 - [self] Escape cancels, Return commits, Command-Z undoes the rename.
-Status: done (name field always editable — better than a pencil; Return commits, onCommit runs diskutil rename, Escape resets the field via .onKeyPress; ⌘Z undo is diskutil rename-back authority, not wired)
+Status: done (name field always editable — better than a pencil; Return commits, onCommit runs diskutil rename, Escape resets the field via .onKeyPress — runtime-verified by driving the running app: typed Q, Escape restored the real name; ⌘Z undo is diskutil rename-back authority, not wired)
 
 ### S-009 Safely eject a disk
 As the user, I eject a whole disk (all its volumes) from a row's button pad.
@@ -375,7 +375,7 @@ As a VoiceOver or keyboard-only user, I can do everything a mouse user can.
 Depends: M1–M5 shipped
 Acceptance:
 - [self] Full flow keyboard-only; VoiceOver labels match screen words (glossary); Accessibility Inspector reports no issues.
-Status: partial (voice labels on dots, tooltips and shortcuts everywhere, menus keyboard-driven; no formal Accessibility Inspector audit yet — the remaining step before M6 closes)
+Status: partial — automated part done (selftest walks the real AX tree and fails on any interactive control with no title/description/help/value — traffic-light window chrome exempted by subrole; currently 0 silent controls). A hands-on VoiceOver + Accessibility Inspector session is the remaining step.
 
 ---
 

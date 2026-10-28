@@ -47,6 +47,24 @@ enum SelfTest {
                 let bootVolumes = model.volumes.filter { $0.isBoot }
                 return bootVolumes.count == 1
             }())
+            // S-044 proxy: every interactive control must answer with some
+            // word — a title, description, label, or help. Catches the
+            // unlabeled-button class of bug automatically; a full
+            // VoiceOver/Inspector audit stays hands-on.
+            // A missing AX window fails loudly — it would be an audit skip.
+            var axWindow: AXUIElement?
+            for _ in 0..<20 {
+                axWindow = SelfTest.windowElement()
+                if axWindow != nil { break }
+                try? await Task.sleep(for: .milliseconds(250))
+            }
+            if let axWindow = axWindow {
+                let silent = SelfTest.unlabeledControls(in: axWindow)
+                check("every control answers with a word (S-044)", silent.isEmpty,
+                      silent.joined(separator: ", "))
+            } else {
+                check("every control answers with a word (S-044)", false, "no AX window")
+            }
 
             print(failures == 0 ? "SELFTEST PASS \(count) checks" : "SELFTEST FAIL \(failures) of \(count) checks")
             finish(code: failures == 0 ? 0 : 1)
@@ -57,6 +75,48 @@ enum SelfTest {
         count += 1
         if !ok { failures += 1 }
         print(ok ? "PASS \(name)" : "FAIL \(name)\(detail.isEmpty ? "" : ": \(detail)")")
+    }
+
+    // MARK: Accessibility audit (S-044)
+
+    private static func windowElement() -> AXUIElement? {
+        let app = AXUIElementCreateApplication(ProcessInfo.processInfo.processIdentifier)
+        var out: AnyObject?
+        guard AXUIElementCopyAttributeValue(app, kAXWindowsAttribute as CFString, &out) == .success,
+              let windows = out as? [AXUIElement], let window = windows.first else { return nil }
+        return window
+    }
+
+    /// Lists interactive elements (buttons, checkboxes, popups, fields)
+    /// whose title, description, help, and value are all empty — the
+    /// controls a screen reader would read as silence.
+    private static func unlabeledControls(in element: AXUIElement, depth: Int = 0) -> [String] {
+        guard depth < 12 else { return [] }
+        var silent: [String] = []
+        var roleValue: AnyObject?
+        AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &roleValue)
+        let role = roleValue as? String ?? ""
+        let chrome: Set<String> = ["AXCloseButton", "AXMinimizeButton",
+                                   "AXZoomButton", "AXFullScreenButton"] // system handles their words
+        if ["AXButton", "AXCheckBox", "AXPopUpButton", "AXTextField", "AXSlider"].contains(role) {
+            var labeled = false
+            for attribute in [kAXTitleAttribute, kAXDescriptionAttribute,
+                              kAXHelpAttribute, kAXValueAttribute] {
+                var raw: AnyObject?
+                AXUIElementCopyAttributeValue(element, attribute as CFString, &raw)
+                if let text = raw as? String, !text.isEmpty { labeled = true }
+            }
+            var subRaw: AnyObject?
+            AXUIElementCopyAttributeValue(element, kAXSubroleAttribute as CFString, &subRaw)
+            let sub = subRaw as? String ?? ""
+            if !labeled && !chrome.contains(sub) { silent.append(role) }
+        }
+        var raw: AnyObject?
+        if AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &raw) == .success,
+           let children = raw as? [AXUIElement] {
+            for child in children { silent += unlabeledControls(in: child, depth: depth + 1) }
+        }
+        return silent
     }
 
     /// Quits through NSApp.terminate, never exit(), and closes sheets first.
